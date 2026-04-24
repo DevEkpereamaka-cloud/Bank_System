@@ -1,0 +1,30 @@
+{
+  "name": "bank_system",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "My bank system",
+  "main": "app.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/DevEkpereamaka-cloud/Bank_System.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/DevEkpereamaka-cloud/Bank_System/issues"
+  },
+  "homepage": "https://github.com/DevEkpereamaka-cloud/Bank_System#readme",
+  "dependencies": {
+    "axios": "^1.15.2",
+    "bcrypt": "^6.0.0",
+    "dotenv": "^17.4.2",
+    "expresse": "^1.0.2",
+    "mongoose": "^9.5.0",
+    "nodemailer": "^8.0.6",
+    "nodemon": "^3.1.14"
+  }
+}
