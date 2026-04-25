@@ -6,13 +6,13 @@ const bankUserSchema = mongoose.Schema(
       type: String,
       required: true,
       trim: true,
-      minlength: true,
+      minlength: 3,
     },
     lastName: {
       type: String,
       required: true,
       trim: true,
-      minlength: true,
+      minlength: 3,
     },
     phone: {
       type: String,
@@ -25,6 +25,11 @@ const bankUserSchema = mongoose.Schema(
       trim: true,
       minlength: 10,
     },
+    dob: {
+      type: String,
+      trim: true,
+      required: true,
+    },
     isVerified: {
       type: Boolean,
       required: true,
@@ -32,7 +37,7 @@ const bankUserSchema = mongoose.Schema(
     },
     passcode: {
       type: String,
-      reguired: true,
+      required: true,
       minlength: 3,
     },
     pin: {
@@ -54,10 +59,16 @@ const bankUserSchema = mongoose.Schema(
       required: true,
       default: null,
     },
+    accountNumber: {
+      type: String,
+      unique: true,
+      sparse: true,
+    },
     accountBalance: {
       type: Number,
       default: 0,
     },
+
     bankName: {
       type: String,
       default: process.env.NIBSS_BANK_NAME,
@@ -65,4 +76,4 @@ const bankUserSchema = mongoose.Schema(
   },
   { timestamps: true },
 );
-export default mongoose.model(bank_Users, bankUserSchema);
+export default mongoose.model("bank_Users", bankUserSchema);

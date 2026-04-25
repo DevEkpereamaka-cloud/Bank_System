@@ -1,6 +1,10 @@
 import userModels from "../models/bankusermodels.js";
-import { verifyUserIdentity } from "../utils/nibssprovider";
+import nibssClient, {
+  verifyUserIdentity,
+  getNibssToken,
+} from "../service/nibssprovider.js";
 import bcrypt from "bcrypt";
+import { generateUniqueAccountNumber } from "../utils/uniquegen.js";
 export const createUser = async (req, res) => {
   try {
     const {
@@ -12,6 +16,7 @@ export const createUser = async (req, res) => {
       verificationId,
       passcode,
       pin,
+      dob,
     } = req.body;
     if (
       !firstName ||
@@ -21,7 +26,8 @@ export const createUser = async (req, res) => {
       !verificationId ||
       !passcode ||
       !pin ||
-      !email
+      !email ||
+      !dob
     ) {
       return res
         .status(401)
@@ -34,9 +40,55 @@ export const createUser = async (req, res) => {
         .status(400)
         .json({ success: false, message: "User already exist" });
     }
-    await verifyUserIdentity(verificationMethod, verificationId);
-    const accNumber = Math.floor(
-      1000000000 + Math.random() * 9000000000,
-    ).toString();
-  } catch (error) {}
+    const nibssData = await verifyUserIdentity(
+      verificationMethod,
+      verificationId,
+    );
+    if (
+      firstName.toLowerCase() !== nibssData.firstName.toLowerCase() ||
+      lastName.toLowerCase() !== nibssData.toLowerCase() ||
+      dob !== nibssData.dob
+    ) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Credentials don't match" });
+    }
+    const token = await getNibssToken();
+    const nibssResponse = await nibssClient.post(
+      "/account/create",
+      {
+        kycType: verificationMethod,
+        kycID: verificationId,
+        dob: dob,
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      },
+    );
+
+    const accountNumber = await generateUniqueAccountNumber();
+    const salt = await bcrypt.genSalt(10);
+    const hashedPin = await bcrypt.hash(pin, salt);
+    const hashedPasscode = await bcrypt.hash(passcode, salt);
+    const newUser = await userModels.create({
+      firstName,
+      lastName,
+      email,
+      phone,
+      passcode: hashedPasscode,
+      pin: hashedPin,
+      isVerified: true,
+      verificationMethod,
+      verificationId,
+      accountNumber,
+      accountBalance: 15000,
+    });
+    res
+      .status(200)
+      .json({ success: true, message: "Account created successfully" });
+  } catch (error) {
+    res.status(400).json({ Error_located: error.message });
+  }
 };
