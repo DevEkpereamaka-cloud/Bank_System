@@ -1,6 +1,6 @@
 import mongoose from "mongoose";
 import dotenv from "dotenv";
-const bankUserSchema = mongoose.Schema(
+const bankUserSchema = new mongoose.Schema(
   {
     firstName: {
       type: String,
@@ -43,15 +43,10 @@ const bankUserSchema = mongoose.Schema(
     pin: {
       type: String,
       required: true,
-      validate: {
-        validator: function (v) {
-          return /^\d{4}$/.test(v);
-        },
-      },
     },
     verificationMethod: {
       type: String,
-      enum: ["BVN", "NIN", null],
+      enum: ["bvn", "nin", null],
       default: null,
     },
     verificationId: {

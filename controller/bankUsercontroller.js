@@ -25,7 +25,7 @@ export const createUser = async (req, res) => {
       !verificationMethod ||
       !verificationId ||
       !passcode ||
-      !pin ||
+      pin.length !== 4 ||
       !email ||
       !dob
     ) {
@@ -44,10 +44,16 @@ export const createUser = async (req, res) => {
       verificationMethod,
       verificationId,
     );
+    if (!nibssData) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid verification info" });
+    }
+    console.log(nibssData);
     if (
-      firstName.toLowerCase() !== nibssData.firstName.toLowerCase() ||
-      lastName.toLowerCase() !== nibssData.toLowerCase() ||
-      dob !== nibssData.dob
+      firstName.toLowerCase() !== nibssData.response.firstName.toLowerCase() ||
+      lastName.toLowerCase() !== nibssData.response.lastName.toLowerCase() ||
+      dob !== nibssData.response.dob
     ) {
       return res
         .status(400)
@@ -57,7 +63,7 @@ export const createUser = async (req, res) => {
     const nibssResponse = await nibssClient.post(
       "/account/create",
       {
-        kycType: verificationMethod,
+        kycType: verificationMethod.toLowerCase(),
         kycID: verificationId,
         dob: dob,
       },
@@ -67,7 +73,8 @@ export const createUser = async (req, res) => {
         },
       },
     );
-
+    const check = nibssResponse.response;
+    console.log(check);
     const accountNumber = await generateUniqueAccountNumber();
     const salt = await bcrypt.genSalt(10);
     const hashedPin = await bcrypt.hash(pin, salt);
@@ -77,6 +84,7 @@ export const createUser = async (req, res) => {
       lastName,
       email,
       phone,
+      dob,
       passcode: hashedPasscode,
       pin: hashedPin,
       isVerified: true,
@@ -85,10 +93,14 @@ export const createUser = async (req, res) => {
       accountNumber,
       accountBalance: 15000,
     });
-    res
-      .status(200)
-      .json({ success: true, message: "Account created successfully" });
+    res.status(200).json({
+      success: true,
+      message: "Account created successfully",
+      data: check,
+    });
   } catch (error) {
-    res.status(400).json({ Error_located: error.message });
+    const realErrorMessage = error.response?.data || error.message;
+    console.log("critical error in create user: ", realErrorMessage);
+    res.status(400).json({ success: false, Error_located: realErrorMessage });
   }
 };

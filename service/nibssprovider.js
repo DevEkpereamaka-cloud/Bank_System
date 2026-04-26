@@ -22,7 +22,7 @@ export const nibssClient = axios.create({
 export const getNibssToken = async () => {
   try {
     const response = await axios.post(
-      `${process.env.NIBSS_BASE_URL}/auth/token`,
+      `${process.env.NIBSS_BASE_URL}auth/token`,
       {
         apiKey: process.env.NIBSS_API_KEY,
         apiSecret: process.env.NIBSS_API_SECRET,
@@ -30,8 +30,12 @@ export const getNibssToken = async () => {
     );
     return response.data.token;
   } catch (error) {
-    console.error(error.message);
-    throw new Error("Sorry couldn't get token from nibs");
+    console.error({
+      "Nibss Token Error": error.response?.data || error.message,
+    });
+    throw new Error(
+      error.response?.data?.message || "Sorry couldn't get token from nibs",
+    );
   }
 };
 export default nibssClient;
