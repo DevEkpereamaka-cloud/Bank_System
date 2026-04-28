@@ -23,7 +23,7 @@ const transactionSchema = new mongoose.Schema(
       enum: ["Success", "Failed"],
       default: "Success",
     },
-    naration: {
+    narration: {
       type: String,
     },
     referenceId: {

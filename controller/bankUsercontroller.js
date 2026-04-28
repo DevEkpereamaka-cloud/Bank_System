@@ -1,12 +1,23 @@
 import userModels from "../models/bankusermodels.js";
+import jwt from "jsonwebtoken";
 import transactionmodels from "../models/transactionmodels.js";
+import { sendWelcomeEmail } from "../utils/emailservice.js";
 import nibssClient, {
   verifyUserIdentity,
   getNibssToken,
 } from "../service/nibssprovider.js";
 import bcrypt from "bcrypt";
+import { decryptData, encryptData } from "../utils/encryption.js";
+import { validateTransfer, validateOnboarding } from "../utils/validation.js";
+import mongoose from "mongoose";
 export const createUser = async (req, res) => {
   try {
+    const { error } = validateOnboarding(req.body);
+    if (error) {
+      return res
+        .status(400)
+        .json({ success: false, message: error.details[0].message });
+    }
     const {
       firstName,
       lastName,
@@ -18,21 +29,6 @@ export const createUser = async (req, res) => {
       pin,
       dob,
     } = req.body;
-    if (
-      !firstName ||
-      !lastName ||
-      !phone ||
-      !verificationMethod ||
-      !verificationId ||
-      !passcode ||
-      pin.length !== 4 ||
-      !email ||
-      !dob
-    ) {
-      return res
-        .status(401)
-        .json({ success: false, message: "Please provide valid informations" });
-    }
     const existingEmail = await userModels.findOne({ email });
     const existingPhone = await userModels.findOne({ phone });
     if (existingEmail || existingPhone) {
@@ -78,6 +74,7 @@ export const createUser = async (req, res) => {
     const salt = await bcrypt.genSalt(10);
     const hashedPin = await bcrypt.hash(pin, salt);
     const hashedPasscode = await bcrypt.hash(passcode, salt);
+    const encryptedVerificationId = await encryptData(verificationId);
     const newUser = await userModels.create({
       firstName,
       lastName,
@@ -88,7 +85,7 @@ export const createUser = async (req, res) => {
       pin: hashedPin,
       isVerified: true,
       verificationMethod,
-      verificationId,
+      verificationId: encryptedVerificationId,
       accountNumber: nibssAccount.accountNumber,
       accountBalance: nibssAccount.balance,
     });
@@ -104,16 +101,46 @@ export const createUser = async (req, res) => {
         joinedAt: newUser.createdAt,
       },
     });
+    await sendWelcomeEmail(newUser.email, newUser.firstName);
   } catch (error) {
     const realErrorMessage = error.response?.data || error.message;
     console.log("critical error in create user: ", realErrorMessage);
     res.status(400).json({ success: false, Error_located: realErrorMessage });
   }
 };
+export const loginUser = async (req, res) => {
+  try {
+    const { email, passcode } = req.body;
+    const user = await userModels.findOne({ email });
+    if (!user) {
+      return res
+        .status(404)
+        .json({ success: false, messsage: "Passcode or Email is Incorrect" });
+    }
+    const isPinValid = await bcrypt.compare(passcode, user.passcode);
+    if (!isPinValid) {
+      return res
+        .status(401)
+        .json({ success: false, message: "Passcode or Email is Incorrect" });
+    }
+    const token = jwt.sign(
+      { accountNumber: user.accountNumber },
+      process.env.JWT_SECRET,
+      { expiresIn: "1h" },
+    );
+    res
+      .status(200)
+      .json({ success: true, message: "login successful", token: token });
+    console.log({ success: true, message: "login successful", token: token });
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Please try again later" });
+    console.log(error.message);
+  }
+};
 export const nameEnquiry = async (req, res) => {
   try {
     const { accountNumber } = req.body;
-    if (accountNumber.length !== 11 || typeof accountNumber !== "String") {
+    if (accountNumber.length !== 10 || typeof accountNumber !== "string") {
       return res
         .status(400)
         .json({ success: false, message: "Invalid Account Number" });
@@ -149,21 +176,23 @@ export const nameEnquiry = async (req, res) => {
   }
 };
 export const initiateTransfer = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
   try {
-    const { from, to, amount, pin, narration } = req.body;
-    if (
-      from.length !== 11 ||
-      to.length !== 11 ||
-      pin.length !== 4 ||
-      typeof narration !== "string"
-    ) {
+    const { to, amount, pin, narration } = req.body;
+    if (to.length !== 10 || pin.length !== 4 || typeof narration !== "string") {
       return res
         .status(400)
         .json({ success: false, message: "Invalid Credentials" });
     }
-    const sender = await userModels.findOne({
-      accountNumber: from,
-    });
+    const from = req.user.accountNumber;
+    const { error } = validateTransfer({ to, amount, pin, narration });
+    if (error) throw new Error(error.details[0].message);
+    const sender = await userModels
+      .findOne({
+        accountNumber: from,
+      })
+      .session(session);
     if (!sender) {
       return res
         .status(404)
@@ -174,9 +203,9 @@ export const initiateTransfer = async (req, res) => {
       return res.status(401).json({ success: false, message: "Invalid Pin" });
     }
     if (sender.accountBalance < amount) {
-      return res.status
+      return res
         .status(400)
-        .json({ success: false, meesage: "Insufficient Funds" });
+        .json({ success: false, mesage: "Insufficient Funds" });
     }
 
     const token = await getNibssToken();
@@ -191,7 +220,7 @@ export const initiateTransfer = async (req, res) => {
         .json({ success: false, message: "Recipient Not Found" });
     }
     const nibssResponse = await nibssClient.post(
-      "/tranfer",
+      "/transfer",
       {
         from,
         to,
@@ -201,35 +230,48 @@ export const initiateTransfer = async (req, res) => {
         headers: { Authorization: `Bearer ${token}` },
       },
     );
-    const refId = nibssResponse.data.refereence;
+    const refId = nibssResponse.data.reference;
     sender.accountBalance -= Number(amount);
-    await sender.save();
-    const localRecipient = await userModels.findOne({ accountNumber: to });
+    await sender.save({ session });
+    const localRecipient = await userModels
+      .findOne({ accountNumber: to })
+      .session(session);
     if (localRecipient) {
       localRecipient.accountBalance += Number(amount);
-      await localRecipient.save();
+      await localRecipient.save({ session });
     }
-    await transactionmodels.create({
-      senderAccountNumber: from,
-      recipientAccountNumber: to,
-      amount,
-      ReferenceId: refId,
-      type: localRecipient ? "Intra-Bank" : "Inter-Bank",
-      narration,
-    });
+    await transactionmodels.create(
+      [
+        {
+          senderAccountNumber: from,
+          recipientAccountNumber: to,
+          amount,
+          referenceId: refId,
+          type: localRecipient ? "Intra-Bank" : "Inter-Bank",
+          narration,
+        },
+      ],
+      { session },
+    );
+    await session.commitTransaction();
+    session.endSession();
     res.status(200).json({
       success: true,
       message: "Transaction Successful",
-      refereence: refId,
+      balance: sender.accountBalance,
+      narration,
+      reference: refId,
     });
     console.log({
       success: true,
       message: "Transaction Successful",
-      refereence: refId,
+      reference: refId,
     });
   } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
     console.log("Transaction Error", error.response?.data || error.message);
-    res.status(400).json({ success: false, message: "transaction failed" });
+    res.status(400).json({ success: false, message: error.message });
   }
 };
 export const getTransactionStatus = async (req, res) => {
@@ -252,7 +294,7 @@ export const getTransactionStatus = async (req, res) => {
 };
 export const getAccountBallance = async (req, res) => {
   try {
-    const { accountNumber } = req.body;
+    const { accountNumber } = req.user;
     const user = await userModels.findOne({ accountNumber });
     if (!user) {
       return res
@@ -271,7 +313,7 @@ export const getAccountBallance = async (req, res) => {
 };
 export const getMyTransactionHistory = async (req, res) => {
   try {
-    const { accountNumber } = req.body;
+    const { accountNumber } = req.user;
     const history = await transactionmodels
       .find({
         $or: [
@@ -290,6 +332,26 @@ export const getMyTransactionHistory = async (req, res) => {
       .json({ success: true, count: history.length, transactions: history });
   } catch (error) {
     res.status(500).json({ success: false, message: "Try again later" });
+    console.log(error.message);
+  }
+};
+export const getMyIdentity = async (req, res) => {
+  try {
+    const { accountNumber } = req.user;
+    const user = await userModels.findOne({ accountNumber });
+    if (!user) {
+      return res
+        .status(404)
+        .json({ success: false, message: "user not found" });
+    }
+    const decryptedId = await decryptData(user.verificationId);
+    res.status(200).json({
+      success: true,
+      verificationMethod: user.verificationMethod,
+      verificationId: decryptedId,
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: "please try again later" });
     console.log(error.message);
   }
 };

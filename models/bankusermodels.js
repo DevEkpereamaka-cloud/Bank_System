@@ -46,8 +46,8 @@ const bankUserSchema = new mongoose.Schema(
     },
     verificationMethod: {
       type: String,
-      enum: ["bvn", "nin", null],
-      default: null,
+      enum: ["bvn", "nin"],
+      required: trur,
     },
     verificationId: {
       type: String,

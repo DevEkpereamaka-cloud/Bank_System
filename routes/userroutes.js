@@ -1,4 +1,5 @@
 import express from "express";
+import { protect } from "../middleware/authmiddleware.js";
 import {
   createUser,
   nameEnquiry,
@@ -6,12 +7,14 @@ import {
   getTransactionStatus,
   getAccountBallance,
   getMyTransactionHistory,
+  getMyIdentity,
 } from "../controller/bankUsercontroller.js";
 const router1 = express.Router();
 router1.post("/izibank/user/join", createUser);
-router1.get("/izibank/user/enquiry/:accountNumber", nameEnquiry);
-router1.get("/izibank/user/transfer", initiateTransfer);
-router1.get("/izibank/user/transaction", getTransactionStatus);
-router1.get("/izibank/user/balance/:accountNumber", getAccountBallance);
-router1.get("/izibank/user/history/:accountNumber", getMyTransactionHistory);
+router1.post("/izibank/user/transfer", protect, initiateTransfer);
+router1.post("/izibank/user/enquiry", protect, nameEnquiry);
+router1.post("/izibank/user/transaction", protect, getTransactionStatus);
+router1.get("/izibank/user/balance", protect, getAccountBallance);
+router1.get("/izibank/user/history", protect, getMyTransactionHistory);
+router1.get("/izibank/user/identity", protect, getMyIdentity);
 export default router1;
