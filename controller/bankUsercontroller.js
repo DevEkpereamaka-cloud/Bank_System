@@ -101,7 +101,7 @@ export const createUser = async (req, res) => {
         joinedAt: newUser.createdAt,
       },
     });
-    await sendWelcomeEmail(newUser.email, newUser.firstName);
+    sendWelcomeEmail(newUser.email, newUser.firstName);
   } catch (error) {
     const realErrorMessage = error.response?.data || error.message;
     console.log("critical error in create user: ", realErrorMessage);
