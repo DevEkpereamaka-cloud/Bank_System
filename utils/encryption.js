@@ -16,6 +16,11 @@ export const encryptData = (text) => {
     });
     let encrypted = cipher.update(text, "utf8", "hex");
     encrypted += cipher.final("hex");
+    const authTagBuffer = cipher.getAuthTag();
+    if (authTagBuffer.length !== AUTH_TAG_LENGTH) {
+      console.log("Someone passed a seal with wrong size");
+      throw new Error("Invalid Seal Size");
+    }
     const authTag = cipher.getAuthTag().toString("hex");
     if (authTag.length !== AUTH_TAG_LENGTH) {
       console.log("Someone passed a seal with wrong size");

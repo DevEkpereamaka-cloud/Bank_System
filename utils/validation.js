@@ -1,6 +1,6 @@
 import joi from "joi";
 const phoneRegex = /^[0-9]{11}$/;
-const pinRegex = /^[0-9]{4}&/;
+const pinRegex = /^[0-9]{4}$/;
 export const validateOnboarding = (data) => {
   const schema = joi
     .object({

@@ -47,7 +47,7 @@ const bankUserSchema = new mongoose.Schema(
     verificationMethod: {
       type: String,
       enum: ["bvn", "nin"],
-      required: trur,
+      required: true,
     },
     verificationId: {
       type: String,
@@ -67,6 +67,14 @@ const bankUserSchema = new mongoose.Schema(
     bankName: {
       type: String,
       default: process.env.NIBSS_BANK_NAME,
+    },
+    loginAttempts: {
+      type: Number,
+      default: 0,
+    },
+    lockUntil: {
+      type: Number,
+      default: null,
     },
   },
   { timestamps: true },

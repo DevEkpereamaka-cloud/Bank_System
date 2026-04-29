@@ -1,9 +1,9 @@
 import nodemailer from "nodemailer";
-import { welcomeEmailTemplate } from "../html/welcome";
+import { welcomeEmailTemplate } from "../html/welcome.js";
 import { transporter } from "../config/mailservice.js";
 import dotenv from "dotenv";
 dotenv.config();
-const sendWelcomeEmail = async (userEmail, firstName) => {
+export const sendWelcomeEmail = async (userEmail, firstName) => {
   try {
     const mailOptions = {
       from: `"IZI Bank" <${process.env.EMAIL_USER}>`,

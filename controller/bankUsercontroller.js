@@ -9,6 +9,7 @@ import nibssClient, {
 import bcrypt from "bcrypt";
 import { decryptData, encryptData } from "../utils/encryption.js";
 import { validateTransfer, validateOnboarding } from "../utils/validation.js";
+import { transferEmailTemplate } from "../html/transfertemplate.js";
 import mongoose from "mongoose";
 export const createUser = async (req, res) => {
   try {
@@ -49,7 +50,8 @@ export const createUser = async (req, res) => {
     if (
       firstName.toLowerCase() !== nibssData.response.firstName.toLowerCase() ||
       lastName.toLowerCase() !== nibssData.response.lastName.toLowerCase() ||
-      dob !== nibssData.response.dob
+      new Date(dob).toISOString().split("T")[0] !==
+        nibssData.response.dob.split("T")[0]
     ) {
       return res
         .status(400)
@@ -104,8 +106,22 @@ export const createUser = async (req, res) => {
     sendWelcomeEmail(newUser.email, newUser.firstName);
   } catch (error) {
     const realErrorMessage = error.response?.data || error.message;
-    console.log("critical error in create user: ", realErrorMessage);
-    res.status(400).json({ success: false, Error_located: realErrorMessage });
+    if (realErrorMessage === "nin already linked to an account") {
+      return res.status(409).json({
+        success: false,
+        message:
+          "This nin is already registered to a Bank Account, Please login to your account",
+      });
+    }
+    console.log(
+      `critical error in create user:`,
+      realErrorMessage,
+      error.message,
+    );
+    res.status(400).json({
+      success: false,
+      message: "Verification Failed please try again later",
+    });
   }
 };
 export const loginUser = async (req, res) => {
@@ -115,14 +131,38 @@ export const loginUser = async (req, res) => {
     if (!user) {
       return res
         .status(404)
-        .json({ success: false, messsage: "Passcode or Email is Incorrect" });
+        .json({ success: false, message: "Passcode or Email is Incorrect" });
     }
-    const isPinValid = await bcrypt.compare(passcode, user.passcode);
-    if (!isPinValid) {
+    if (user.lockUntil && user.lockUntil > Date.now()) {
+      const remainingTime = Math.ceil(
+        (user.lockUntil - Date.now()) / 1000 / 60,
+      );
+      console.log(`${user._id} Account  is on lock until ${remainingTime}`);
+      return res.status(403).json({
+        success: false,
+        message: "Your account is locked please try again later",
+      });
+    }
+    const isPasscodeValid = await bcrypt.compare(passcode, user.passcode);
+    if (!isPasscodeValid) {
+      user.loginAttempts += 1;
+
+      if (user.loginAttempts >= 5) {
+        user.lockUntil = Date.now() + 15 * 60 * 1000;
+        await user.save();
+        return res.status(403).json({
+          success: false,
+          message: "Too many failed attempts try again later",
+        });
+      }
+      await user.save();
       return res
         .status(401)
         .json({ success: false, message: "Passcode or Email is Incorrect" });
     }
+    user.loginAttempts = 0;
+    user.lockUntil = null;
+    await user.save();
     const token = jwt.sign(
       { accountNumber: user.accountNumber },
       process.env.JWT_SECRET,
@@ -159,7 +199,7 @@ export const nameEnquiry = async (req, res) => {
       `/account/name-enquiry/${accountNumber}`,
       {
         headers: {
-          Authorization: `  Bearer ${token}`,
+          Authorization: ` Bearer ${token}`,
         },
       },
     );
@@ -205,7 +245,7 @@ export const initiateTransfer = async (req, res) => {
     if (sender.accountBalance < amount) {
       return res
         .status(400)
-        .json({ success: false, mesage: "Insufficient Funds" });
+        .json({ success: false, message: "Insufficient Funds" });
     }
 
     const token = await getNibssToken();
@@ -261,6 +301,15 @@ export const initiateTransfer = async (req, res) => {
       balance: sender.accountBalance,
       narration,
       reference: refId,
+    });
+    await transferEmailTemplate(sender.email, {
+      firstName: sender.firstName,
+      amount: amount,
+      recipientName: recipient.data.accountName,
+      recipientBank: recipient.data.bankName,
+      refId: refId,
+      balance: sender.accountBalance,
+      narration: narration,
     });
     console.log({
       success: true,
