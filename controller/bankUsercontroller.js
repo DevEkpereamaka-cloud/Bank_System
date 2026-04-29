@@ -105,12 +105,13 @@ export const createUser = async (req, res) => {
     });
     sendWelcomeEmail(newUser.email, newUser.firstName);
   } catch (error) {
-    const realErrorMessage = error.response?.data || error.message;
+    const realErrorMessage = error.response?.data.message;
     if (realErrorMessage === "nin already linked to an account") {
+      console.log(realErrorMessage);
       return res.status(409).json({
         success: false,
         message:
-          "This nin is already registered to a Bank Account, Please login to your account",
+          " This nin is already registered to a Bank Account, Please login to your account",
       });
     }
     console.log(
@@ -216,8 +217,8 @@ export const nameEnquiry = async (req, res) => {
   }
 };
 export const initiateTransfer = async (req, res) => {
-  const session = await mongoose.startSession();
-  session.startTransaction();
+  //  const session = await mongoose.startSession();
+  //session.startTransaction();
   try {
     const { to, amount, pin, narration } = req.body;
     if (to.length !== 10 || pin.length !== 4 || typeof narration !== "string") {
@@ -259,6 +260,7 @@ export const initiateTransfer = async (req, res) => {
         .status(404)
         .json({ success: false, message: "Recipient Not Found" });
     }
+    console.log("checking if recipient account is real:", recipient);
     const nibssResponse = await nibssClient.post(
       "/transfer",
       {
@@ -278,7 +280,8 @@ export const initiateTransfer = async (req, res) => {
       .session(session);
     if (localRecipient) {
       localRecipient.accountBalance += Number(amount);
-      await localRecipient.save({ session });
+      await localRecipient.save();
+      //  await localRecipient.save({ session });
     }
     await transactionmodels.create(
       [
@@ -291,10 +294,10 @@ export const initiateTransfer = async (req, res) => {
           narration,
         },
       ],
-      { session },
+      //{ session },
     );
-    await session.commitTransaction();
-    session.endSession();
+    // await session.commitTransaction();
+    //session.endSession();
     res.status(200).json({
       success: true,
       message: "Transaction Successful",
@@ -318,7 +321,7 @@ export const initiateTransfer = async (req, res) => {
     });
   } catch (error) {
     await session.abortTransaction();
-    session.endSession();
+    // session.endSession();
     console.log("Transaction Error", error.response?.data || error.message);
     res.status(400).json({ success: false, message: error.message });
   }
