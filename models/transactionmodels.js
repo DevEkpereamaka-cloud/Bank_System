@@ -9,6 +9,14 @@ const transactionSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    senderAccountName: {
+      type: String,
+      required: true,
+    },
+    recipientAccountName: {
+      type: String,
+      required: true,
+    },
     amount: {
       type: Number,
       required: true,

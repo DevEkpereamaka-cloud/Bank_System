@@ -229,11 +229,10 @@ export const initiateTransfer = async (req, res) => {
     const from = req.user.accountNumber;
     const { error } = validateTransfer({ to, amount, pin, narration });
     if (error) throw new Error(error.details[0].message);
-    const sender = await userModels
-      .findOne({
-        accountNumber: from,
-      })
-      .session(session);
+    const sender = await userModels.findOne({
+      accountNumber: from,
+    });
+    // .session(session);
     if (!sender) {
       return res
         .status(404)
@@ -274,10 +273,10 @@ export const initiateTransfer = async (req, res) => {
     );
     const refId = nibssResponse.data.reference;
     sender.accountBalance -= Number(amount);
-    await sender.save({ session });
-    const localRecipient = await userModels
-      .findOne({ accountNumber: to })
-      .session(session);
+    await sender.save();
+    // await sender.save({ session });
+    const localRecipient = await userModels.findOne({ accountNumber: to });
+    // .session(session);
     if (localRecipient) {
       localRecipient.accountBalance += Number(amount);
       await localRecipient.save();
@@ -288,6 +287,8 @@ export const initiateTransfer = async (req, res) => {
         {
           senderAccountNumber: from,
           recipientAccountNumber: to,
+          senderAccountName: ` ${from.firstName} ${from.lastName}`,
+          recipientAccountName: to.fullName,
           amount,
           referenceId: refId,
           type: localRecipient ? "Intra-Bank" : "Inter-Bank",
@@ -320,7 +321,7 @@ export const initiateTransfer = async (req, res) => {
       reference: refId,
     });
   } catch (error) {
-    await session.abortTransaction();
+    // await session.abortTransaction();
     // session.endSession();
     console.log("Transaction Error", error.response?.data || error.message);
     res.status(400).json({ success: false, message: error.message });
