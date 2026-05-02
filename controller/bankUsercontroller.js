@@ -103,7 +103,7 @@ export const createUser = async (req, res) => {
         joinedAt: newUser.createdAt,
       },
     });
-    sendWelcomeEmail(newUser.email, newUser.firstName);
+    await sendWelcomeEmail(newUser.email, newUser.firstName);
   } catch (error) {
     const realErrorMessage = error.response?.data.message;
     if (realErrorMessage === "nin already linked to an account") {
@@ -181,7 +181,11 @@ export const loginUser = async (req, res) => {
 export const nameEnquiry = async (req, res) => {
   try {
     const { accountNumber } = req.body;
-    if (accountNumber.length !== 10 || typeof accountNumber !== "string") {
+    if (
+      !accountNumber ||
+      accountNumber.length !== 10 ||
+      typeof accountNumber !== "string"
+    ) {
       return res
         .status(400)
         .json({ success: false, message: "Invalid Account Number" });
@@ -204,13 +208,17 @@ export const nameEnquiry = async (req, res) => {
         },
       },
     );
+    await sendWelcomeEmail(localUser.email, localUser.firstName);
+    if (!sendWelcomeEmail()) {
+      console.log("email send failed");
+    }
     res.status(200).json({
       success: true,
       accountName: externalUser.data.accountName,
       bankName: externalUser.data.bankName,
       type: "external",
     });
-    console.log({ success: true, data: externalUser.data });
+    console.log({ success: true, data: externalUser });
   } catch (error) {
     res.status(404).json({ success: false, message: "Account not found" });
     console.log(error.message);
@@ -282,13 +290,14 @@ export const initiateTransfer = async (req, res) => {
       await localRecipient.save();
       //  await localRecipient.save({ session });
     }
+    console.log(`Recipient is:`, recipient);
     await transactionmodels.create(
       [
         {
           senderAccountNumber: from,
           recipientAccountNumber: to,
-          senderAccountName: ` ${from.firstName} ${from.lastName}`,
-          recipientAccountName: to.fullName,
+          senderAccountName: ` ${sender.firstName} ${sender.lastName}`,
+          recipientAccountName: recipient.data.accountName,
           amount,
           referenceId: refId,
           type: localRecipient ? "Intra-Bank" : "Inter-Bank",
