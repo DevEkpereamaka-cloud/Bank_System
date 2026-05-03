@@ -286,7 +286,7 @@ export const initiateTransfer = async (req, res) => {
       await localRecipient.save();
       //  await localRecipient.save({ session });
     }
-    console.log(`Recipient is:`, recipient);
+    console.log(`Recipient is:`, recipient.data);
     await transactionmodels.create(
       [
         {
@@ -316,7 +316,9 @@ export const initiateTransfer = async (req, res) => {
       firstName: sender.firstName,
       amount: amount,
       recipientName: recipient.data.accountName,
-      recipientBank: recipient.data.bankName,
+      recipientBank: recipient.data.bankName
+        ? recipient.data.bankName
+        : "IZI Bank",
       refId: refId,
       balance: sender.accountBalance,
       narration: narration,
