@@ -208,10 +208,6 @@ export const nameEnquiry = async (req, res) => {
         },
       },
     );
-    await sendWelcomeEmail(localUser.email, localUser.firstName);
-    if (!sendWelcomeEmail()) {
-      console.log("email send failed");
-    }
     res.status(200).json({
       success: true,
       accountName: externalUser.data.accountName,
@@ -267,7 +263,7 @@ export const initiateTransfer = async (req, res) => {
         .status(404)
         .json({ success: false, message: "Recipient Not Found" });
     }
-    console.log("checking if recipient account is real:", recipient);
+    console.log("checking if recipient account is real:", recipient.data);
     const nibssResponse = await nibssClient.post(
       "/transfer",
       {
@@ -356,7 +352,7 @@ export const getTransactionStatus = async (req, res) => {
 };
 export const getAccountBallance = async (req, res) => {
   try {
-    const { accountNumber } = req.user;
+    const accountNumber = req.user.accountNumber;
     const user = await userModels.findOne({ accountNumber });
     if (!user) {
       return res
@@ -375,7 +371,7 @@ export const getAccountBallance = async (req, res) => {
 };
 export const getMyTransactionHistory = async (req, res) => {
   try {
-    const { accountNumber } = req.user;
+    const accountNumber = req.user.accountNumber;
     const history = await transactionmodels
       .find({
         $or: [
@@ -399,7 +395,7 @@ export const getMyTransactionHistory = async (req, res) => {
 };
 export const getMyIdentity = async (req, res) => {
   try {
-    const { accountNumber } = req.user;
+    const accountNumber = req.user.accountNumber;
     const user = await userModels.findOne({ accountNumber });
     if (!user) {
       return res
