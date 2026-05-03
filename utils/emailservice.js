@@ -1,5 +1,6 @@
 import nodemailer from "nodemailer";
 import { welcomeEmailTemplate } from "../html/welcome.js";
+import { transferEmailTemplate } from "../html/transfertemplate.js";
 import { transporter } from "../config/mailservice.js";
 import dotenv from "dotenv";
 dotenv.config();
@@ -16,6 +17,30 @@ export const sendWelcomeEmail = async (userEmail, firstName) => {
     console.log({
       success: true,
       message: `Welcome email successfully sent to ${firstName}`,
+    });
+    console.log("Nodemailer delivered the email");
+  } catch (error) {
+    console.log({
+      success: false,
+      info: "Nodemailer failed",
+      message: error.message,
+    });
+  }
+};
+
+export const sendTransferEmail = async (data) => {
+  console.log("Nodemailer is about to start");
+  try {
+    const mailOptions = {
+      from: `"IZI Bank" <${process.env.EMAIL_USER}>`,
+      to: data.email,
+      subject: "Transaction email",
+      html: transferEmailTemplate(data),
+    };
+    await transporter.sendMail(mailOptions);
+    console.log({
+      success: true,
+      message: `Transaction Email successfully sent to ${data.firstName}`,
     });
     console.log("Nodemailer delivered the email");
   } catch (error) {

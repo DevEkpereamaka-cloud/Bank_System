@@ -1,7 +1,7 @@
 import userModels from "../models/bankusermodels.js";
 import jwt from "jsonwebtoken";
 import transactionmodels from "../models/transactionmodels.js";
-import { sendWelcomeEmail } from "../utils/emailservice.js";
+import { sendWelcomeEmail, sendTransferEmail } from "../utils/emailservice.js";
 import nibssClient, {
   verifyUserIdentity,
   getNibssToken,
@@ -311,7 +311,8 @@ export const initiateTransfer = async (req, res) => {
       narration,
       reference: refId,
     });
-    await transferEmailTemplate(sender.email, {
+    await sendTransferEmail({
+      email: sender.email,
       firstName: sender.firstName,
       amount: amount,
       recipientName: recipient.data.accountName,

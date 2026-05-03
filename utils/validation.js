@@ -24,7 +24,7 @@ export const validateTransfer = (data) => {
         .string()
         .pattern(/^[0-9]{10}$/)
         .required(),
-      amount: joi.number().integer().positive().min(1000).required(),
+      amount: joi.number().integer().positive().min(10).required(),
       pin: joi.string().pattern(pinRegex).required(),
       narration: joi.string().trim().max(50).allow(""),
     })
