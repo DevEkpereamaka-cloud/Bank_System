@@ -286,7 +286,6 @@ export const initiateTransfer = async (req, res) => {
       await localRecipient.save();
       //  await localRecipient.save({ session });
     }
-    console.log(`Recipient is:`, recipient.data);
     await transactionmodels.create(
       [
         {
@@ -316,9 +315,7 @@ export const initiateTransfer = async (req, res) => {
       firstName: sender.firstName,
       amount: amount,
       recipientName: recipient.data.accountName,
-      recipientBank: recipient.data.bankName
-        ? recipient.data.bankName
-        : "IZI Bank",
+      recipientBank: localRecipient ? "IZI Bank" : "Inter-Bank",
       refId: refId,
       balance: sender.accountBalance,
       narration: narration,
@@ -362,6 +359,17 @@ export const getAccountBallance = async (req, res) => {
         .status(404)
         .json({ success: false, message: "Account Not Found" });
     }
+    const token = await getNibssToken();
+    const response = await nibssClient.get(
+      `/account/balance/${accountNumber}`,
+      {
+        headers: {
+          Authorization: ` Bearer ${token}`,
+        },
+      },
+    );
+    user.accountBalance = response.data.balance;
+    await user.save();
     res.status(200).json({
       success: true,
       accountNumber: user.accountNumber,
